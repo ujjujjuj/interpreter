@@ -3,8 +3,12 @@ from enum import Enum, auto
 
 class NonTerminal(Enum):
     PROGRAM = auto()
-    EXPR = auto()
+    STATEMENTS = auto()
     STATEMENT = auto()
+    
+    EXPR = auto()
+    TERM = auto()
+    FACTOR = auto()
 
 
 class Terminal(Enum):
@@ -15,6 +19,8 @@ class Terminal(Enum):
     DIVIDE = auto()
     LPAREN = auto()
     RPAREN = auto()
+
+    NEWLINE = auto()
 
 
 class Operation(Enum):

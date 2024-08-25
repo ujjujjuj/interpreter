@@ -47,7 +47,7 @@ class LexerIter:
 
             return Token(token_type=token_type, lexeme=lexeme)
 
-        for ignore_pattern in self._lexer._ignore_list():
+        for ignore_pattern in self._lexer._ignore_list:
             ignore_lexeme = re.match("^" + ignore_pattern, self._code_str[self._curr :])
             if ignore_lexeme != None:
                 span = ignore_lexeme.span()
