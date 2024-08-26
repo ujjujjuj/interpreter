@@ -1,53 +1,10 @@
-from __future__ import annotations
 from lex import Lexer, Token
-from typing import Callable, Any
 from .node import Node
 from enum import Enum
 from .constants import *
 from functools import cache
 from collections import deque, defaultdict
-from dataclasses import dataclass, field
-import pandas as pd
-
-
-@dataclass(frozen=True)
-class Production:
-    lhs: Enum
-    rhs: tuple[Enum]
-    func: Callable[..., Node]
-
-
-@dataclass(frozen=True)
-class LRItem:
-    production: Production
-    lookahead: frozenset[Enum]
-    index: int
-
-
-@dataclass
-class ItemSet:
-    items: frozenset[LRItem]
-    idx: int
-    neighbors: dict[Enum, ItemSet] = field(default_factory=lambda: {})
-
-
-@dataclass
-class ParseState:
-    counter: int = 0
-    basis_sets: dict[frozenset[LRItem], int] = field(default_factory=lambda: {})
-    itemSets: dict[int, ItemSet] = field(default_factory=lambda: {})
-
-
-@dataclass
-class Action:
-    aType: ActionType
-    val: int
-
-
-@dataclass
-class SemanticItem:
-    sym: Enum
-    node: Node
+from .defs import *
 
 
 class Parser:
@@ -58,8 +15,6 @@ class Parser:
         self._action_goto = action_goto
 
     def parse(self, code_str: str, lexer: Lexer):
-        # with pd.option_context("display.max_rows", None, "display.max_columns", None):
-        #     print(pd.DataFrame(self._action_goto))
 
         token_stack: list[Enum] = []
         state_stack: list[int] = [0]
@@ -115,7 +70,6 @@ class Parser:
 
         startItem = token_stack.pop()
         return startItem.node
-        # exit(42)
 
 
 class ParserGenerator:
@@ -157,17 +111,6 @@ class ParserGenerator:
                     break
 
         return first
-
-    # @cache
-    # def _find_rhs_first(self, rhs: frozenset[Enum]) -> set[Enum]:
-    #     for rhs_sym in rhs:
-    #         rhs_first = self._find_first(rhs_sym)
-    #         if len(rhs_first) != 0:
-    #             return rhs_first
-
-    #     return {
-    #         SpecialSymbol.END,
-    #     }
 
     @cache
     def _find_item_follow(self, item: LRItem) -> set[Enum]:
@@ -263,20 +206,6 @@ class ParserGenerator:
             parse_state=parse_state,
         )
 
-        # for groupIdx in parse_state.itemSets:
-        #     group = parse_state.itemSets[groupIdx]
-        # print(f"------ Group {group.idx} ------")
-        # for node in group.items:
-        #     production = list(map(lambda v: v.name, node.production.rhs))
-        #     production.insert(node.index, ".")
-        #     lookahead = list(map(lambda v: v.name, node.lookahead))
-        #     nextGroupIdx = None
-        #     if node.index < len(node.production.rhs):
-        #         nextGroupIdx = group.neighbors[node.production.rhs[node.index]].idx
-        #     print(
-        #         f"{node.production.lhs.name}: {' '.join(production)} ; {' '.join(lookahead)} ; ---> {nextGroupIdx}"
-        #     )
-
         prodIdx: dict[Production, int] = {}
         for idx, prod in enumerate(self._productions):
             prodIdx[prod] = idx
@@ -314,17 +243,5 @@ class ParserGenerator:
         return action_goto
 
     def generate(self) -> Parser:
-        # for token in lexer.lex(code_str):
-        #     print(token)
-        # for nt_symbol in self._non_terminal_symbols:
-        #     print(
-        #         f"{nt_symbol}:\n  first={self._find_first(nt_symbol)}\n  follow={self._find_follow(nt_symbol)}"
-        #     )
-        # print()
         action_goto = self._get_action_goto()
         return Parser(action_goto=action_goto, productions=self._productions)
-
-        # for groupIdx in parse_state.itemSets:
-        #     print("-----")
-        #     for aug_node in parse_state.itemSets[groupIdx]:
-        #         print(aug_node)
