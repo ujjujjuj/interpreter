@@ -44,6 +44,12 @@ class Action:
     val: int
 
 
+@dataclass
+class SemanticItem:
+    sym: Enum
+    node: Node
+
+
 class Parser:
     def __init__(
         self, action_goto: list[dict[Enum, Action]], productions: list[Production]
@@ -52,8 +58,8 @@ class Parser:
         self._action_goto = action_goto
 
     def parse(self, code_str: str, lexer: Lexer):
-        with pd.option_context("display.max_rows", None, "display.max_columns", None):
-            print(pd.DataFrame(self._action_goto))
+        # with pd.option_context("display.max_rows", None, "display.max_columns", None):
+        #     print(pd.DataFrame(self._action_goto))
 
         token_stack: list[Enum] = []
         state_stack: list[int] = [0]
@@ -62,7 +68,6 @@ class Parser:
         tok_consume = True
         tok = None
         while True:
-            print(token_stack, state_stack, tok)
             try:
                 if tok_consume:
                     tok = next(tok_iter)
@@ -70,9 +75,8 @@ class Parser:
             except StopIteration:
                 if tok.token_type == SpecialSymbol.END:
                     raise ValueError("Parsing error: No more tokens left")
-                tok = Token(token_type=SpecialSymbol.END,lexeme="$")
+                tok = Token(token_type=SpecialSymbol.END, lexeme="$")
                 tok_consume = False
-
 
             if len(state_stack) == 0:
                 raise ValueError("Parsing error: Ran out of states")
@@ -83,27 +87,34 @@ class Parser:
                 raise ValueError("Parsing error: No action to perform")
 
             action = self._action_goto[state][tok.token_type]
-            
-            print(action)
+
             if action.aType == ActionType.SHIFT:
-                token_stack.append(tok.token_type)
+                token_stack.append(tok)
                 state_stack.append(action.val)
                 tok_consume = True
                 continue
             elif action.aType == ActionType.REDUCE:
                 prod = self._productions[action.val]
-                for _ in prod.rhs:
-                    token_stack.pop()
-                    state_stack.pop()
-                token_stack.append(prod.lhs)
-                state_stack.append(self._action_goto[state_stack[-1]][prod.lhs].val)
+
+                node = prod.func(
+                    *[
+                        sym.node if isinstance(sym, SemanticItem) else sym.lexeme
+                        for sym in token_stack[-len(prod.rhs) :]
+                    ]
+                )
+
+                token_stack = token_stack[: -len(prod.rhs)]
+                state_stack = state_stack[: -len(prod.rhs)]
+
+                sym = self._action_goto[state_stack[-1]][prod.lhs].val
+                token_stack.append(SemanticItem(sym=prod.lhs, node=node))
+                state_stack.append(sym)
                 continue
             elif action.aType == ActionType.ACCEPT:
-                print("accept")
                 break
-            exit(42)
-        print("parsed")
-        print(token_stack, state_stack)
+
+        startItem = token_stack.pop()
+        return startItem.node
         # exit(42)
 
 
@@ -128,7 +139,6 @@ class ParserGenerator:
 
     @cache
     def _find_first(self, sym: Enum) -> set[Enum]:
-        print(sym)
         if sym in self._terminal_symbols:
             return {sym}
 
@@ -253,19 +263,19 @@ class ParserGenerator:
             parse_state=parse_state,
         )
 
-        for groupIdx in parse_state.itemSets:
-            group = parse_state.itemSets[groupIdx]
-            print(f"------ Group {group.idx} ------")
-            for node in group.items:
-                production = list(map(lambda v: v.name, node.production.rhs))
-                production.insert(node.index, ".")
-                lookahead = list(map(lambda v: v.name, node.lookahead))
-                nextGroupIdx = None
-                if node.index < len(node.production.rhs):
-                    nextGroupIdx = group.neighbors[node.production.rhs[node.index]].idx
-                print(
-                    f"{node.production.lhs.name}: {' '.join(production)} ; {' '.join(lookahead)} ; ---> {nextGroupIdx}"
-                )
+        # for groupIdx in parse_state.itemSets:
+        #     group = parse_state.itemSets[groupIdx]
+        # print(f"------ Group {group.idx} ------")
+        # for node in group.items:
+        #     production = list(map(lambda v: v.name, node.production.rhs))
+        #     production.insert(node.index, ".")
+        #     lookahead = list(map(lambda v: v.name, node.lookahead))
+        #     nextGroupIdx = None
+        #     if node.index < len(node.production.rhs):
+        #         nextGroupIdx = group.neighbors[node.production.rhs[node.index]].idx
+        #     print(
+        #         f"{node.production.lhs.name}: {' '.join(production)} ; {' '.join(lookahead)} ; ---> {nextGroupIdx}"
+        #     )
 
         prodIdx: dict[Production, int] = {}
         for idx, prod in enumerate(self._productions):
@@ -282,7 +292,8 @@ class ParserGenerator:
                         action_goto[groupIdx][lookahead_sym] = Action(
                             aType=(
                                 ActionType.ACCEPT
-                                if lookahead_sym == SpecialSymbol.END and item.production.lhs == SpecialSymbol.START
+                                if lookahead_sym == SpecialSymbol.END
+                                and item.production.lhs == SpecialSymbol.START
                                 else ActionType.REDUCE
                             ),
                             val=prodIdx[item.production],

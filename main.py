@@ -1,8 +1,16 @@
 from mylang import lexer, parser
+from interpreter import Interpreter
 
 test_code = """\
-2*3+5\
+a = 3*(3+6)
+b = 42
+print(a+b)\
 """
 
-ast = parser.parse(code_str=test_code, lexer=lexer)
-
+interpreter = Interpreter()
+while True:
+    code = input("> ")
+    ast = parser.parse(code, lexer=lexer)
+    node = interpreter.interpret(ast)
+    if node:
+        print(interpreter.getVal(node))
