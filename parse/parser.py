@@ -39,7 +39,7 @@ class Parser:
             state = state_stack[-1]
 
             if tok.token_type not in self._action_goto[state]:
-                raise ValueError("Parsing error: No action to perform")
+                raise SyntaxError("Parsing error: No action to perform")
 
             action = self._action_goto[state][tok.token_type]
 
